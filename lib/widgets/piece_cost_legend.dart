@@ -13,6 +13,7 @@ class PieceCostLegend extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
     final pieces = [
       _PieceCostItem('King', '\u2654', preset.king),
       _PieceCostItem('Queen', '\u2655', preset.queen),
@@ -32,15 +33,19 @@ class PieceCostLegend extends StatelessWidget {
           label: Text(
             '${item.cost}',
             style: TextStyle(
-              color: canAfford ? Colors.black : Colors.red,
+              color: canAfford
+                  ? theme.colorScheme.onSurface
+                  : Colors.red.shade700,
               fontWeight: canAfford ? FontWeight.normal : FontWeight.bold,
             ),
           ),
           backgroundColor: canAfford
-              ? Colors.green.shade50
+              ? theme.colorScheme.primaryContainer.withValues(alpha: 0.5)
               : Colors.red.shade50,
           side: BorderSide(
-            color: canAfford ? Colors.green.shade200 : Colors.red.shade200,
+            color: canAfford
+                ? theme.colorScheme.primary.withValues(alpha: 0.3)
+                : Colors.red.shade200,
           ),
         );
       }).toList(),

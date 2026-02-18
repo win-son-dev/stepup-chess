@@ -7,17 +7,43 @@ class MoveHistoryPanel extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    if (moves.isEmpty) {
-      return const Padding(
-        padding: EdgeInsets.all(8.0),
-        child: Text(
-          'No moves yet',
-          style: TextStyle(color: Colors.grey),
-        ),
-      );
-    }
+    final theme = Theme.of(context);
 
-    // Pair moves into (white, black) rows
+    return Container(
+      margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      decoration: BoxDecoration(
+        color: const Color(0xFFFFF3E0),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(
+          color: const Color(0xFF8D6E63).withValues(alpha: 0.2),
+        ),
+      ),
+      child: moves.isEmpty
+          ? Padding(
+              padding: const EdgeInsets.all(4),
+              child: Text(
+                'No moves yet',
+                style: TextStyle(
+                  color: theme.colorScheme.secondary.withValues(alpha: 0.6),
+                  fontStyle: FontStyle.italic,
+                ),
+              ),
+            )
+          : SizedBox(
+              height: 100,
+              child: SingleChildScrollView(
+                reverse: true,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: _buildRows(theme),
+                ),
+              ),
+            ),
+    );
+  }
+
+  List<Widget> _buildRows(ThemeData theme) {
     final rows = <Widget>[];
     for (var i = 0; i < moves.length; i += 2) {
       final moveNum = (i ~/ 2) + 1;
@@ -25,42 +51,47 @@ class MoveHistoryPanel extends StatelessWidget {
       final blackMove = (i + 1 < moves.length) ? moves[i + 1] : '';
       rows.add(
         Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+          padding: const EdgeInsets.symmetric(vertical: 2),
           child: Row(
             children: [
               SizedBox(
                 width: 32,
                 child: Text(
                   '$moveNum.',
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontWeight: FontWeight.bold,
-                    color: Colors.grey,
+                    fontSize: 13,
+                    color: theme.colorScheme.outline,
                   ),
                 ),
               ),
               SizedBox(
-                width: 60,
-                child: Text(whiteMove, style: const TextStyle(fontWeight: FontWeight.w500)),
+                width: 64,
+                child: Text(
+                  whiteMove,
+                  style: TextStyle(
+                    fontWeight: FontWeight.w600,
+                    fontSize: 14,
+                    color: theme.colorScheme.onSurface,
+                  ),
+                ),
               ),
               SizedBox(
-                width: 60,
-                child: Text(blackMove, style: const TextStyle(fontWeight: FontWeight.w500)),
+                width: 64,
+                child: Text(
+                  blackMove,
+                  style: TextStyle(
+                    fontWeight: FontWeight.w600,
+                    fontSize: 14,
+                    color: theme.colorScheme.onSurface,
+                  ),
+                ),
               ),
             ],
           ),
         ),
       );
     }
-
-    return SizedBox(
-      height: 120,
-      child: SingleChildScrollView(
-        reverse: true,
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: rows,
-        ),
-      ),
-    );
+    return rows;
   }
 }

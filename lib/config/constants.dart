@@ -8,6 +8,7 @@ const String gameFenKey = 'game_fen';
 const String gamePresetNameKey = 'game_preset_name';
 const String gameStatusKey = 'game_status';
 const String gameMoveHistoryKey = 'game_move_history';
+const String gameCostModeKey = 'game_cost_mode';
 
 final List<StepCostPreset> presets = [
   StepCostPreset(
@@ -18,6 +19,7 @@ final List<StepCostPreset> presets = [
     rook: 7,
     queen: 10,
     king: 3,
+    distanceCost: 1,
   ),
   StepCostPreset(
     name: 'Normal',
@@ -27,6 +29,7 @@ final List<StepCostPreset> presets = [
     rook: 100,
     queen: 150,
     king: 30,
+    distanceCost: 10,
   ),
   StepCostPreset(
     name: 'Marathon',
@@ -36,5 +39,6 @@ final List<StepCostPreset> presets = [
     rook: 500,
     queen: 750,
     king: 100,
+    distanceCost: 50,
   ),
 ];

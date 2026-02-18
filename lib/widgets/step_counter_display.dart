@@ -10,12 +10,14 @@ class StepCounterDisplay extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final stepBag = ref.watch(stepBagProvider);
+    final theme = Theme.of(context);
 
     return stepBag.when(
       data: (steps) => Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(Icons.directions_walk, size: fontSize, color: Colors.green),
+          Icon(Icons.directions_walk,
+              size: fontSize, color: theme.colorScheme.primary),
           const SizedBox(width: 8),
           AnimatedSwitcher(
             duration: const Duration(milliseconds: 300),
@@ -25,7 +27,7 @@ class StepCounterDisplay extends ConsumerWidget {
               style: TextStyle(
                 fontSize: fontSize,
                 fontWeight: FontWeight.bold,
-                color: Colors.green.shade700,
+                color: theme.colorScheme.primary,
               ),
             ),
           ),
@@ -34,7 +36,7 @@ class StepCounterDisplay extends ConsumerWidget {
             'steps',
             style: TextStyle(
               fontSize: fontSize * 0.5,
-              color: Colors.grey.shade600,
+              color: theme.colorScheme.secondary,
             ),
           ),
         ],
@@ -42,7 +44,8 @@ class StepCounterDisplay extends ConsumerWidget {
       loading: () => Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(Icons.directions_walk, size: fontSize, color: Colors.grey),
+          Icon(Icons.directions_walk,
+              size: fontSize, color: theme.colorScheme.outline),
           const SizedBox(width: 8),
           const SizedBox(
             width: 20,

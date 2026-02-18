@@ -3,6 +3,9 @@ import 'package:flutter_chess_board/flutter_chess_board.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:stepup_chess/config/constants.dart';
+import 'package:stepup_chess/engine/piece.dart';
+import 'package:stepup_chess/engine/cost_calculator.dart';
+import 'package:stepup_chess/engine/stepup_engine.dart';
 import 'package:stepup_chess/models/game.dart';
 import 'package:stepup_chess/models/step_cost_preset.dart';
 import 'package:stepup_chess/services/step_tracker_service.dart';
@@ -12,16 +15,27 @@ final chessGameProvider =
     NotifierProvider<ChessGameNotifier, GameState>(ChessGameNotifier.new);
 
 class ChessGameNotifier extends Notifier<GameState> {
-  ChessBoardController? _boardController;
+  late StepUpEngine engine;
 
   StepTrackerService get _stepService => ref.read(stepTrackerServiceProvider);
   SharedPreferences get _prefs => ref.read(sharedPreferencesProvider);
 
-  chess.Chess get _game => _boardController!.game;
-
   @override
   GameState build() {
-    return _loadPersistedGame();
+    final gameState = _loadPersistedGame();
+    engine = StepUpEngine(_buildCalculator(gameState.costMode, gameState.preset));
+    return gameState;
+  }
+
+  static CostCalculator _buildCalculator(CostMode mode, StepCostPreset preset) {
+    switch (mode) {
+      case CostMode.baseDistance:
+        return BaseDistanceCostCalculator(preset);
+      case CostMode.distance:
+        return DistanceCostCalculator(preset);
+      case CostMode.fixed:
+        return FixedCostCalculator(preset);
+    }
   }
 
   GameState _loadPersistedGame() {
@@ -45,6 +59,11 @@ class ChessGameNotifier extends Notifier<GameState> {
     final fen = _prefs.getString(gameFenKey) ?? chess.Chess.DEFAULT_POSITION;
     final presetName = _prefs.getString(gamePresetNameKey) ?? 'Quick';
     final moveHistory = _prefs.getStringList(gameMoveHistoryKey) ?? [];
+    final costModeName = _prefs.getString(gameCostModeKey) ?? 'distance';
+    final costMode = CostMode.values.firstWhere(
+      (m) => m.name == costModeName,
+      orElse: () => CostMode.distance,
+    );
 
     final preset = presets.firstWhere(
       (p) => p.name == presetName,
@@ -54,6 +73,7 @@ class ChessGameNotifier extends Notifier<GameState> {
     return GameState(
       fen: fen,
       preset: preset,
+      costMode: costMode,
       status: GameStatus.active,
       moveHistory: moveHistory,
     );
@@ -62,6 +82,7 @@ class ChessGameNotifier extends Notifier<GameState> {
   void _persistGame() {
     _prefs.setString(gameFenKey, state.fen);
     _prefs.setString(gamePresetNameKey, state.preset.name);
+    _prefs.setString(gameCostModeKey, state.costMode.name);
     _prefs.setString(gameStatusKey, state.status.name);
     _prefs.setStringList(gameMoveHistoryKey, state.moveHistory);
   }
@@ -69,19 +90,22 @@ class ChessGameNotifier extends Notifier<GameState> {
   void _clearPersistedGame() {
     _prefs.remove(gameFenKey);
     _prefs.remove(gamePresetNameKey);
+    _prefs.remove(gameCostModeKey);
     _prefs.remove(gameStatusKey);
     _prefs.remove(gameMoveHistoryKey);
   }
 
   void attachBoardController(ChessBoardController controller) {
-    _boardController = controller;
+    engine.attachController(controller);
   }
 
-  void startNewGame(StepCostPreset preset) {
-    _boardController?.resetBoard();
+  void startNewGame(StepCostPreset preset, {CostMode costMode = CostMode.distance}) {
+    engine.costCalculator = _buildCalculator(costMode, preset);
+    engine.startNewGame();
     state = GameState(
       fen: chess.Chess.DEFAULT_POSITION,
       preset: preset,
+      costMode: costMode,
       status: GameStatus.active,
       moveHistory: [],
     );
@@ -97,86 +121,62 @@ class ChessGameNotifier extends Notifier<GameState> {
     );
   }
 
-  /// Get cost for a piece type. Double cost if capturing a king.
-  int getCost(chess.PieceType pieceType, {bool capturingKing = false}) {
-    final baseCost = state.preset.costFor(pieceType);
-    return capturingKing ? baseCost * 2 : baseCost;
+  /// Step cost for moving [piece] from [from] to [to].
+  int moveCost(PieceKind piece, String from, String to,
+      {bool capturingKing = false}) {
+    return engine.moveCost(piece, from, to, capturingKing: capturingKing);
   }
 
   /// Check if either king is under attack (in check).
-  /// Returns 'white', 'black', or null.
-  String? getCheckedSide() {
-    final fen = _game.fen;
-    final parts = fen.split(' ');
-
-    // in_check: true if the side to move is in check
-    // To check if white is in check: set turn to white
-    parts[1] = 'w';
-    final testWhite = chess.Chess.fromFEN(parts.join(' '));
-    if (testWhite.in_check) return 'white';
-
-    parts[1] = 'b';
-    final testBlack = chess.Chess.fromFEN(parts.join(' '));
-    if (testBlack.in_check) return 'black';
-
-    return null;
+  PieceColor? getCheckedSide() {
+    return engine.checkedSide();
   }
 
-  /// Check if a move can be afforded BEFORE making it.
-  bool canAffordMove(chess.PieceType pieceType) {
-    final cost = getCost(pieceType);
+  /// Check if a move can be afforded.
+  bool canAffordMove(PieceKind piece, String from, String to) {
+    final cost = engine.moveCost(piece, from, to);
     return _stepService.canAfford(cost);
   }
 
   /// Charge steps and record the move AFTER it has been made on the board.
-  void chargeAndRecordMove(chess.PieceType pieceType) {
-    final cost = getCost(pieceType);
+  void chargeAndRecordMove(PieceKind piece, String from, String to) {
+    final cost = engine.moveCost(piece, from, to);
     _stepService.spendSteps(cost);
 
-    final sanMoves = _game.san_moves();
-    final lastSan = sanMoves.isNotEmpty ? sanMoves.last ?? '' : '';
+    final lastSan = engine.lastSanMove ?? '';
 
     state = state.copyWith(
-      fen: _game.fen,
+      fen: engine.fen,
       moveHistory: [...state.moveHistory, lastSan],
     );
     _persistGame();
   }
 
   /// Handle king capture — called from the board widget when a piece
-  /// is dropped on a king's square. The chess engine can't do this move,
-  /// so we manually update the board.
+  /// is dropped on a king's square.
   bool handleKingCapture({
     required String from,
     required String to,
-    required chess.PieceType attackerType,
-    required chess.Color capturedKingColor,
+    required PieceKind attackerKind,
+    required PieceColor capturedKingColor,
   }) {
-    final cost = getCost(attackerType, capturingKing: true);
+    final cost = engine.moveCost(attackerKind, from, to, capturingKing: true);
 
     if (!_stepService.canAfford(cost)) return false;
 
     _stepService.spendSteps(cost);
 
-    // Manually update the board: remove king, move attacker
-    final attacker = _game.get(from);
-    _game.remove(from);
-    _game.remove(to);
-    if (attacker != null) {
-      _game.put(attacker, to);
-    }
+    engine.handleKingCapture(from, to);
 
-    final moveNotation = '${attackerType.toUpperCase()}x$to#';
+    final moveNotation =
+        '${StepUpEngine.pieceKindToChar(attackerKind)}x$to#';
 
     state = state.copyWith(
-      fen: _game.fen,
+      fen: engine.fen,
       status: GameStatus.kingCaptured,
       moveHistory: [...state.moveHistory, moveNotation],
     );
     _persistGame();
-
-    // Refresh the board display by loading the updated FEN
-    _boardController?.loadFen(_game.fen);
 
     return true;
   }

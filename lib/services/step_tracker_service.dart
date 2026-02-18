@@ -27,10 +27,15 @@ class StepTrackerService {
   }
 
   void startListening() {
-    _subscription = _pedometer.stepCountStream().listen(
-      _onStepCount,
-      onError: _onStepCountError,
-    );
+    try {
+      _subscription = _pedometer.stepCountStream().listen(
+        _onStepCount,
+        onError: _onStepCountError,
+      );
+    } catch (_) {
+      // Pedometer plugin not available on this platform (e.g. web/desktop).
+      // Step bag stays at its current persisted balance; use "Add Steps" button.
+    }
   }
 
   void _onStepCount(int newCumulative) {

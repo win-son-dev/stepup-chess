@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_chess_board/flutter_chess_board.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:stepup_chess/engine/piece.dart';
 import 'package:stepup_chess/providers/chess_provider.dart';
 import 'package:stepup_chess/providers/step_provider.dart';
 import 'package:stepup_chess/models/game.dart';
@@ -35,60 +36,39 @@ class _GameScreenState extends ConsumerState<GameScreen> {
     });
   }
 
-  bool _canAfford(PieceType pieceType) {
+  bool _canAfford(PieceKind piece, String from, String to) {
     final notifier = ref.read(chessGameProvider.notifier);
-    final chessPieceType = _toChessPieceType(pieceType);
-    final affordable = notifier.canAffordMove(chessPieceType);
+    final affordable = notifier.canAffordMove(piece, from, to);
     if (!affordable) {
       _showCantAffordSnackbar();
     }
     return affordable;
   }
 
-  void _onChargeMove(PieceType pieceType) {
+  void _onChargeMove(PieceKind piece, String from, String to) {
     final notifier = ref.read(chessGameProvider.notifier);
-    final chessPieceType = _toChessPieceType(pieceType);
-    notifier.chargeAndRecordMove(chessPieceType);
+    notifier.chargeAndRecordMove(piece, from, to);
   }
 
-  int _getCost(PieceType pieceType, {bool capturingKing = false}) {
+  int _getCost(PieceKind piece, String from, String to,
+      {bool capturingKing = false}) {
     final notifier = ref.read(chessGameProvider.notifier);
-    final chessPieceType = _toChessPieceType(pieceType);
-    return notifier.getCost(chessPieceType, capturingKing: capturingKing);
+    return notifier.moveCost(piece, from, to, capturingKing: capturingKing);
   }
 
-  void _onMove() {
-    final notifier = ref.read(chessGameProvider.notifier);
-    // Check if either king is in check after this move
-    final checkedSide = notifier.getCheckedSide();
-    if (checkedSide != null) {
-      _showCheckSnackbar(checkedSide);
-    }
-  }
-
-  chess.PieceType _toChessPieceType(PieceType pt) {
-    switch (pt) {
-      case PieceType.PAWN: return chess.PieceType.PAWN;
-      case PieceType.KNIGHT: return chess.PieceType.KNIGHT;
-      case PieceType.BISHOP: return chess.PieceType.BISHOP;
-      case PieceType.ROOK: return chess.PieceType.ROOK;
-      case PieceType.QUEEN: return chess.PieceType.QUEEN;
-      case PieceType.KING: return chess.PieceType.KING;
-      default: return chess.PieceType.PAWN;
-    }
-  }
+  void _onMove() {}
 
   bool _onKingCapture({
     required String from,
     required String to,
-    required PieceType attackerType,
-    required Color capturedKingColor,
+    required PieceKind attackerKind,
+    required PieceColor capturedKingColor,
   }) {
     final notifier = ref.read(chessGameProvider.notifier);
     final success = notifier.handleKingCapture(
       from: from,
       to: to,
-      attackerType: attackerType,
+      attackerKind: attackerKind,
       capturedKingColor: capturedKingColor,
     );
 
@@ -98,25 +78,15 @@ class _GameScreenState extends ConsumerState<GameScreen> {
     }
 
     // Show game over
-    final winner = capturedKingColor == Color.WHITE ? 'Black' : 'White';
+    final winner =
+        capturedKingColor == PieceColor.white ? 'Black' : 'White';
     _showGameEndDialog(GameStatus.kingCaptured, winner: winner);
     return true;
   }
 
-  void _showCheckSnackbar(String checkedSide) {
-    final color = checkedSide == 'white' ? 'White' : 'Black';
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text('$color king is in check!'),
-        backgroundColor: Colors.orange,
-        duration: const Duration(seconds: 2),
-      ),
-    );
-  }
-
   void _showCantAffordSnackbar({bool isKingCapture = false}) {
     final msg = isKingCapture
-        ? 'Not enough steps! King capture costs DOUBLE.'
+        ? 'Not enough steps for king capture!'
         : 'Not enough steps! Keep walking to earn more.';
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
@@ -188,6 +158,14 @@ class _GameScreenState extends ConsumerState<GameScreen> {
     );
   }
 
+  String _costModeLabel(CostMode mode) {
+    return switch (mode) {
+      CostMode.baseDistance => 'Base+Dist',
+      CostMode.distance => 'Distance',
+      CostMode.fixed => 'Fixed',
+    };
+  }
+
   void _addTestSteps() {
     ref.read(stepTrackerServiceProvider).addSteps(100);
   }
@@ -195,10 +173,20 @@ class _GameScreenState extends ConsumerState<GameScreen> {
   @override
   Widget build(BuildContext context) {
     final gameState = ref.watch(chessGameProvider);
+    final notifier = ref.read(chessGameProvider.notifier);
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('StepUp Chess'),
+        title: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text('StepUp Chess'),
+            Text(
+              '${gameState.preset.name} \u2022 ${_costModeLabel(gameState.costMode)}',
+              style: const TextStyle(fontSize: 12, fontWeight: FontWeight.normal),
+            ),
+          ],
+        ),
         actions: [
           IconButton(
             icon: const Icon(Icons.add_circle_outline),
@@ -225,6 +213,7 @@ class _GameScreenState extends ConsumerState<GameScreen> {
             Expanded(
               child: Center(
                 child: StepUpChessBoard(
+                  engine: notifier.engine,
                   controller: _boardController,
                   boardColor: BoardColor.green,
                   enableUserMoves: gameState.status == GameStatus.active,
