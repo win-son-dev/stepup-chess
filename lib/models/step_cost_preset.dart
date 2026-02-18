@@ -19,7 +19,8 @@ class StepCostPreset {
     required this.king,
   });
 
-  int costFor(chess.PieceType type) {
+  int costFor(chess.PieceType type)
+  {
     switch (type) {
       case chess.PieceType.PAWN:
         return pawn;

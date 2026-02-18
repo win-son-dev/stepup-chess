@@ -4,6 +4,11 @@ const String stepBagKey = 'step_bag_balance';
 const String stepBaselineKey = 'step_baseline';
 const String lastKnownStepsKey = 'last_known_steps';
 
+const String gameFenKey = 'game_fen';
+const String gamePresetNameKey = 'game_preset_name';
+const String gameStatusKey = 'game_status';
+const String gameMoveHistoryKey = 'game_move_history';
+
 final List<StepCostPreset> presets = [
   StepCostPreset(
     name: 'Quick',

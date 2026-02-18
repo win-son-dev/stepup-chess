@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:stepup_chess/models/game.dart';
+import 'package:stepup_chess/providers/chess_provider.dart';
 import 'package:stepup_chess/providers/step_provider.dart';
 import 'package:stepup_chess/widgets/step_counter_display.dart';
 
@@ -9,6 +11,9 @@ class HomeScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final gameState = ref.watch(chessGameProvider);
+    final hasActiveGame = gameState.status == GameStatus.active;
+
     return Scaffold(
       body: SafeArea(
         child: Center(
@@ -39,20 +44,51 @@ class HomeScreen extends ConsumerWidget {
                 const SizedBox(height: 48),
                 const StepCounterDisplay(fontSize: 32),
                 const SizedBox(height: 48),
-                FilledButton.icon(
-                  onPressed: () => context.go('/create'),
-                  icon: const Icon(Icons.add),
-                  label: const Text(
-                    'New Game',
-                    style: TextStyle(fontSize: 18),
-                  ),
-                  style: FilledButton.styleFrom(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 32,
-                      vertical: 16,
+                if (hasActiveGame) ...[
+                  FilledButton.icon(
+                    onPressed: () => context.go('/game'),
+                    icon: const Icon(Icons.play_arrow),
+                    label: const Text(
+                      'Continue Game',
+                      style: TextStyle(fontSize: 18),
+                    ),
+                    style: FilledButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 32,
+                        vertical: 16,
+                      ),
                     ),
                   ),
-                ),
+                  const SizedBox(height: 16),
+                  OutlinedButton.icon(
+                    onPressed: () => _confirmNewGame(context, ref),
+                    icon: const Icon(Icons.add),
+                    label: const Text(
+                      'New Game',
+                      style: TextStyle(fontSize: 18),
+                    ),
+                    style: OutlinedButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 32,
+                        vertical: 16,
+                      ),
+                    ),
+                  ),
+                ] else
+                  FilledButton.icon(
+                    onPressed: () => context.go('/create'),
+                    icon: const Icon(Icons.add),
+                    label: const Text(
+                      'New Game',
+                      style: TextStyle(fontSize: 18),
+                    ),
+                    style: FilledButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 32,
+                        vertical: 16,
+                      ),
+                    ),
+                  ),
                 const SizedBox(height: 24),
                 OutlinedButton.icon(
                   onPressed: () {
@@ -65,6 +101,35 @@ class HomeScreen extends ConsumerWidget {
             ),
           ),
         ),
+      ),
+    );
+  }
+
+  void _confirmNewGame(BuildContext context, WidgetRef ref) {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Abandon Game?'),
+        content: const Text(
+          'You have a game in progress. Starting a new game will abandon it.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () {
+              Navigator.of(ctx).pop();
+              ref.read(chessGameProvider.notifier).clearGame();
+              context.go('/create');
+            },
+            child: const Text(
+              'Abandon',
+              style: TextStyle(color: Colors.red),
+            ),
+          ),
+        ],
       ),
     );
   }

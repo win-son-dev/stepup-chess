@@ -1,6 +1,6 @@
 import 'package:stepup_chess/models/step_cost_preset.dart';
 
-enum GameStatus { active, kingCaptured, stalemate, draw, resigned }
+enum GameStatus { notStarted, active, kingCaptured, stalemate, draw, resigned }
 
 class GameState {
   final String fen;

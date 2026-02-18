@@ -1,11 +1,12 @@
+import 'package:chess/chess.dart' as chess;
 import 'package:flutter/material.dart';
 import 'package:flutter_chess_board/flutter_chess_board.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import 'package:stepup_chess/providers/chess_provider.dart';
 import 'package:stepup_chess/providers/step_provider.dart';
 import 'package:stepup_chess/models/game.dart';
 import 'package:stepup_chess/widgets/step_counter_display.dart';
-import 'package:stepup_chess/widgets/piece_cost_legend.dart';
 import 'package:stepup_chess/widgets/move_history_panel.dart';
 import 'package:stepup_chess/widgets/stepup_chess_board.dart';
 
@@ -24,23 +25,56 @@ class _GameScreenState extends ConsumerState<GameScreen> {
     super.initState();
     _boardController = ChessBoardController();
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      ref.read(chessGameProvider.notifier).attachBoardController(_boardController);
+      final notifier = ref.read(chessGameProvider.notifier);
+      notifier.attachBoardController(_boardController);
+      // Restore board position if resuming a game
+      final gameState = ref.read(chessGameProvider);
+      if (gameState.fen != chess.Chess.DEFAULT_POSITION) {
+        _boardController.loadFen(gameState.fen);
+      }
     });
+  }
+
+  bool _canAfford(PieceType pieceType) {
+    final notifier = ref.read(chessGameProvider.notifier);
+    final chessPieceType = _toChessPieceType(pieceType);
+    final affordable = notifier.canAffordMove(chessPieceType);
+    if (!affordable) {
+      _showCantAffordSnackbar();
+    }
+    return affordable;
+  }
+
+  void _onChargeMove(PieceType pieceType) {
+    final notifier = ref.read(chessGameProvider.notifier);
+    final chessPieceType = _toChessPieceType(pieceType);
+    notifier.chargeAndRecordMove(chessPieceType);
+  }
+
+  int _getCost(PieceType pieceType, {bool capturingKing = false}) {
+    final notifier = ref.read(chessGameProvider.notifier);
+    final chessPieceType = _toChessPieceType(pieceType);
+    return notifier.getCost(chessPieceType, capturingKing: capturingKing);
   }
 
   void _onMove() {
     final notifier = ref.read(chessGameProvider.notifier);
-    final success = notifier.validateAndChargeLastMove();
-
-    if (!success) {
-      _showCantAffordSnackbar();
-      return;
-    }
-
     // Check if either king is in check after this move
     final checkedSide = notifier.getCheckedSide();
     if (checkedSide != null) {
       _showCheckSnackbar(checkedSide);
+    }
+  }
+
+  chess.PieceType _toChessPieceType(PieceType pt) {
+    switch (pt) {
+      case PieceType.PAWN: return chess.PieceType.PAWN;
+      case PieceType.KNIGHT: return chess.PieceType.KNIGHT;
+      case PieceType.BISHOP: return chess.PieceType.BISHOP;
+      case PieceType.ROOK: return chess.PieceType.ROOK;
+      case PieceType.QUEEN: return chess.PieceType.QUEEN;
+      case PieceType.KING: return chess.PieceType.KING;
+      default: return chess.PieceType.PAWN;
     }
   }
 
@@ -120,7 +154,8 @@ class _GameScreenState extends ConsumerState<GameScreen> {
           TextButton(
             onPressed: () {
               Navigator.of(ctx).pop();
-              Navigator.of(context).pop();
+              ref.read(chessGameProvider.notifier).clearGame();
+              context.go('/');
             },
             child: const Text('Back to Home'),
           ),
@@ -160,9 +195,6 @@ class _GameScreenState extends ConsumerState<GameScreen> {
   @override
   Widget build(BuildContext context) {
     final gameState = ref.watch(chessGameProvider);
-    final stepBag = ref.watch(stepBagProvider);
-    final currentSteps =
-        stepBag.value ?? ref.read(stepTrackerServiceProvider).stepBag;
 
     return Scaffold(
       appBar: AppBar(
@@ -194,20 +226,14 @@ class _GameScreenState extends ConsumerState<GameScreen> {
               child: Center(
                 child: StepUpChessBoard(
                   controller: _boardController,
-                  boardColor: BoardColor.brown,
+                  boardColor: BoardColor.green,
                   enableUserMoves: gameState.status == GameStatus.active,
+                  canAfford: _canAfford,
+                  onChargeMove: _onChargeMove,
+                  getCost: _getCost,
                   onMove: _onMove,
                   onKingCapture: _onKingCapture,
                 ),
-              ),
-            ),
-
-            // Piece cost legend
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-              child: PieceCostLegend(
-                preset: gameState.preset,
-                availableSteps: currentSteps,
               ),
             ),
 
