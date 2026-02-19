@@ -4,12 +4,21 @@ enum GameStatus { notStarted, active, kingCaptured, stalemate, draw, resigned }
 
 enum CostMode { baseDistance, distance, fixed }
 
+/// The squares involved in the most recent move, used for board highlighting.
+class LastMove {
+  final String from;
+  final String to;
+
+  const LastMove(this.from, this.to);
+}
+
 class GameState {
   final String fen;
   final StepCostPreset preset;
   final CostMode costMode;
   final GameStatus status;
   final List<String> moveHistory;
+  final LastMove? lastMove;
 
   const GameState({
     required this.fen,
@@ -17,6 +26,7 @@ class GameState {
     this.costMode = CostMode.distance,
     this.status = GameStatus.active,
     this.moveHistory = const [],
+    this.lastMove,
   });
 
   GameState copyWith({
@@ -25,6 +35,7 @@ class GameState {
     CostMode? costMode,
     GameStatus? status,
     List<String>? moveHistory,
+    LastMove? lastMove,
   }) {
     return GameState(
       fen: fen ?? this.fen,
@@ -32,6 +43,7 @@ class GameState {
       costMode: costMode ?? this.costMode,
       status: status ?? this.status,
       moveHistory: moveHistory ?? this.moveHistory,
+      lastMove: lastMove ?? this.lastMove,
     );
   }
 }

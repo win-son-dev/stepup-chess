@@ -20,16 +20,16 @@ class BaseDistanceCostCalculator implements CostCalculator {
   int calculate(PieceKind piece, String from, String to,
       {bool capturingKing = false}) {
     final base = preset.costFor(piece);
-    return base + chebyshevDistance(from, to) * preset.distanceCost;
+    return base + moveDistance(piece, from, to) * preset.distanceCost;
   }
 }
 
 /// Pure distance cost: distance * distanceCost, no base added.
 ///
-/// Chebyshev distance = max(|dx|, |dy|) — the number of king-moves between
-/// two squares. This naturally maps to how far a piece actually travels:
+/// Uses Chebyshev distance (max(|dx|, |dy|)) for all pieces except knights,
+/// which use Manhattan distance (|dx| + |dy| = 3) to reflect the full L-shape:
 ///   - Pawn: 1 (one square forward)
-///   - Knight: always 2 (L-shape fits in a 2×2 Chebyshev box)
+///   - Knight: always 3 (2 + 1 squares for the L-shape)
 ///   - Bishop/Rook/Queen: number of squares traversed
 ///   - King: 1 (one square in any direction)
 class DistanceCostCalculator implements CostCalculator {
@@ -40,7 +40,7 @@ class DistanceCostCalculator implements CostCalculator {
   @override
   int calculate(PieceKind piece, String from, String to,
       {bool capturingKing = false}) {
-    return chebyshevDistance(from, to) * preset.distanceCost;
+    return moveDistance(piece, from, to) * preset.distanceCost;
   }
 }
 
@@ -63,5 +63,14 @@ class FixedCostCalculator implements CostCalculator {
 int chebyshevDistance(String from, String to) {
   final dx = (to.codeUnitAt(0) - from.codeUnitAt(0)).abs();
   final dy = (to.codeUnitAt(1) - from.codeUnitAt(1)).abs();
+  return max(dx, dy);
+}
+
+/// Distance for a piece move. Knights use Manhattan distance (|dx|+|dy| = 3)
+/// to reflect the full L-shape; all other pieces use Chebyshev distance.
+int moveDistance(PieceKind piece, String from, String to) {
+  final dx = (to.codeUnitAt(0) - from.codeUnitAt(0)).abs();
+  final dy = (to.codeUnitAt(1) - from.codeUnitAt(1)).abs();
+  if (piece == PieceKind.knight) return dx + dy; // always 3 for a valid L-move
   return max(dx, dy);
 }

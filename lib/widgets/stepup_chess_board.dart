@@ -3,6 +3,7 @@ import 'package:flutter/material.dart' as material;
 import 'package:flutter_chess_board/flutter_chess_board.dart' hide BoardPiece;
 import 'package:stepup_chess/engine/piece.dart';
 import 'package:stepup_chess/engine/stepup_engine.dart';
+import 'package:stepup_chess/models/game.dart';
 
 /// Callback when a piece attempts to capture a king.
 typedef KingCaptureCallback = bool Function({
@@ -32,6 +33,7 @@ class StepUpChessBoard extends StatefulWidget {
   final bool enableUserMoves;
   final BoardColor boardColor;
   final PlayerColor boardOrientation;
+  final LastMove? lastMove;
   final VoidCallback? onMove;
   final KingCaptureCallback? onKingCapture;
   final CanAffordCallback? canAfford;
@@ -46,6 +48,7 @@ class StepUpChessBoard extends StatefulWidget {
     this.enableUserMoves = true,
     this.boardColor = BoardColor.green,
     this.boardOrientation = PlayerColor.white,
+    this.lastMove,
     this.onMove,
     this.onKingCapture,
     this.canAfford,
@@ -314,6 +317,10 @@ class _StepUpChessBoardState extends State<StepUpChessBoard> {
                         // Build the square content
                         Widget squareContent;
 
+                        final isLastMove = widget.lastMove != null &&
+                            (squareName == widget.lastMove!.from ||
+                                squareName == widget.lastMove!.to);
+
                         if (isLegalTarget) {
                           final isKingCapture =
                               _kingCaptureSquares.contains(squareName);
@@ -431,6 +438,21 @@ class _StepUpChessBoardState extends State<StepUpChessBoard> {
                               ),
                             ],
                           );
+                        } else if (isLastMove) {
+                          squareContent = Stack(
+                            children: [
+                              _tappableSquare(
+                                squareName: squareName,
+                                child: dragTarget(squareName, draggable),
+                              ),
+                              IgnorePointer(
+                                child: Container(
+                                  color: material.Colors.amber
+                                      .withValues(alpha: 0.45),
+                                ),
+                              ),
+                            ],
+                          );
                         } else {
                           squareContent = _tappableSquare(
                             squareName: squareName,
@@ -487,7 +509,20 @@ class _StepUpChessBoardState extends State<StepUpChessBoard> {
 
   Widget dragTarget(String squareName, Widget child) {
     return DragTarget<_PieceMoveData>(
-      builder: (context, list, _) => child,
+      builder: (context, candidateData, _) {
+        final isHovered = candidateData.isNotEmpty;
+        return Stack(
+          children: [
+            child,
+            if (isHovered)
+              IgnorePointer(
+                child: Container(
+                  color: material.Colors.black.withValues(alpha: 0.35),
+                ),
+              ),
+          ],
+        );
+      },
       onWillAcceptWithDetails: (details) => widget.enableUserMoves,
       onAcceptWithDetails: (details) async {
         final moveData = details.data;

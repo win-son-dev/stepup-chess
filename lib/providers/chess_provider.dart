@@ -3,8 +3,10 @@ import 'package:flutter_chess_board/flutter_chess_board.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:stepup_chess/config/constants.dart';
+import 'package:stepup_chess/config/service_locator.dart';
 import 'package:stepup_chess/engine/piece.dart';
 import 'package:stepup_chess/engine/cost_calculator.dart';
+import 'package:stepup_chess/engine/rule_engine_factory.dart';
 import 'package:stepup_chess/engine/stepup_engine.dart';
 import 'package:stepup_chess/models/game.dart';
 import 'package:stepup_chess/models/step_cost_preset.dart';
@@ -23,7 +25,10 @@ class ChessGameNotifier extends Notifier<GameState> {
   @override
   GameState build() {
     final gameState = _loadPersistedGame();
-    engine = StepUpEngine(_buildCalculator(gameState.costMode, gameState.preset));
+    engine = StepUpEngine(
+      getIt<RuleEngineFactory>().create(RuleVariant.standard),
+      _buildCalculator(gameState.costMode, gameState.preset),
+    );
     return gameState;
   }
 
@@ -97,10 +102,15 @@ class ChessGameNotifier extends Notifier<GameState> {
 
   void attachBoardController(ChessBoardController controller) {
     engine.attachController(controller);
+    // Sync persisted position into both the rule engine and the UI controller.
+    engine.loadPosition(state.fen);
   }
 
-  void startNewGame(StepCostPreset preset, {CostMode costMode = CostMode.distance}) {
-    engine.costCalculator = _buildCalculator(costMode, preset);
+  void startNewGame(StepCostPreset preset, {CostMode costMode = CostMode.distance, RuleVariant variant = RuleVariant.standard}) {
+    engine = StepUpEngine(
+      getIt<RuleEngineFactory>().create(variant),
+      _buildCalculator(costMode, preset),
+    );
     engine.startNewGame();
     state = GameState(
       fen: chess.Chess.DEFAULT_POSITION,
@@ -148,6 +158,7 @@ class ChessGameNotifier extends Notifier<GameState> {
     state = state.copyWith(
       fen: engine.fen,
       moveHistory: [...state.moveHistory, lastSan],
+      lastMove: LastMove(from, to),
     );
     _persistGame();
   }
@@ -175,6 +186,7 @@ class ChessGameNotifier extends Notifier<GameState> {
       fen: engine.fen,
       status: GameStatus.kingCaptured,
       moveHistory: [...state.moveHistory, moveNotation],
+      lastMove: LastMove(from, to),
     );
     _persistGame();
 

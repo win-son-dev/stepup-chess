@@ -1,4 +1,3 @@
-import 'package:chess/chess.dart' as chess;
 import 'package:flutter/material.dart';
 import 'package:flutter_chess_board/flutter_chess_board.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -26,13 +25,9 @@ class _GameScreenState extends ConsumerState<GameScreen> {
     super.initState();
     _boardController = ChessBoardController();
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      final notifier = ref.read(chessGameProvider.notifier);
-      notifier.attachBoardController(_boardController);
-      // Restore board position if resuming a game
-      final gameState = ref.read(chessGameProvider);
-      if (gameState.fen != chess.Chess.DEFAULT_POSITION) {
-        _boardController.loadFen(gameState.fen);
-      }
+      // attachBoardController syncs the persisted FEN into both the rule
+      // engine and the UI controller, so no separate loadFen call is needed.
+      ref.read(chessGameProvider.notifier).attachBoardController(_boardController);
     });
   }
 
@@ -217,6 +212,7 @@ class _GameScreenState extends ConsumerState<GameScreen> {
                   controller: _boardController,
                   boardColor: BoardColor.green,
                   enableUserMoves: gameState.status == GameStatus.active,
+                  lastMove: gameState.lastMove,
                   canAfford: _canAfford,
                   onChargeMove: _onChargeMove,
                   getCost: _getCost,

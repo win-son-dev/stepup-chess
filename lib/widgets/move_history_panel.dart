@@ -34,64 +34,34 @@ class MoveHistoryPanel extends StatelessWidget {
               height: 100,
               child: SingleChildScrollView(
                 reverse: true,
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: _buildRows(theme),
+                scrollDirection: Axis.horizontal,
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.center,
+                  children: [
+                    for (final move in moves)
+                      Container(
+                        margin: const EdgeInsets.symmetric(horizontal: 3),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 10,
+                          vertical: 4,
+                        ),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFD7CCC8),
+                          borderRadius: BorderRadius.circular(6),
+                        ),
+                        child: Text(
+                          move,
+                          style: TextStyle(
+                            fontWeight: FontWeight.w600,
+                            fontSize: 14,
+                            color: theme.colorScheme.onSurface,
+                          ),
+                        ),
+                      ),
+                  ],
                 ),
               ),
             ),
     );
-  }
-
-  List<Widget> _buildRows(ThemeData theme) {
-    final rows = <Widget>[];
-    for (var i = 0; i < moves.length; i += 2) {
-      final moveNum = (i ~/ 2) + 1;
-      final whiteMove = moves[i];
-      final blackMove = (i + 1 < moves.length) ? moves[i + 1] : '';
-      rows.add(
-        Padding(
-          padding: const EdgeInsets.symmetric(vertical: 2),
-          child: Row(
-            children: [
-              SizedBox(
-                width: 32,
-                child: Text(
-                  '$moveNum.',
-                  style: TextStyle(
-                    fontWeight: FontWeight.bold,
-                    fontSize: 13,
-                    color: theme.colorScheme.outline,
-                  ),
-                ),
-              ),
-              SizedBox(
-                width: 64,
-                child: Text(
-                  whiteMove,
-                  style: TextStyle(
-                    fontWeight: FontWeight.w600,
-                    fontSize: 14,
-                    color: theme.colorScheme.onSurface,
-                  ),
-                ),
-              ),
-              SizedBox(
-                width: 64,
-                child: Text(
-                  blackMove,
-                  style: TextStyle(
-                    fontWeight: FontWeight.w600,
-                    fontSize: 14,
-                    color: theme.colorScheme.onSurface,
-                  ),
-                ),
-              ),
-            ],
-          ),
-        ),
-      );
-    }
-    return rows;
   }
 }
