@@ -9,6 +9,7 @@ const String gamePresetNameKey = 'game_preset_name';
 const String gameStatusKey = 'game_status';
 const String gameMoveHistoryKey = 'game_move_history';
 const String gameCostModeKey = 'game_cost_mode';
+const String gameFenHistoryKey = 'game_fen_history';
 
 final List<StepCostPreset> presets = [
   StepCostPreset(

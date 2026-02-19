@@ -20,6 +20,18 @@ class GameState {
   final List<String> moveHistory;
   final LastMove? lastMove;
 
+  /// Ordered list of FENs: index 0 = initial position, each subsequent entry
+  /// is the position after that move was made.
+  final List<String> fenHistory;
+
+  /// Index into [fenHistory] currently displayed on the board.
+  /// Normally equals `fenHistory.length - 1` (latest position).
+  final int historyIndex;
+
+  /// True when the player is browsing history (not at the latest position).
+  bool get isReviewing =>
+      fenHistory.isNotEmpty && historyIndex < fenHistory.length - 1;
+
   const GameState({
     required this.fen,
     required this.preset,
@@ -27,6 +39,8 @@ class GameState {
     this.status = GameStatus.active,
     this.moveHistory = const [],
     this.lastMove,
+    this.fenHistory = const [],
+    this.historyIndex = 0,
   });
 
   GameState copyWith({
@@ -36,6 +50,8 @@ class GameState {
     GameStatus? status,
     List<String>? moveHistory,
     LastMove? lastMove,
+    List<String>? fenHistory,
+    int? historyIndex,
   }) {
     return GameState(
       fen: fen ?? this.fen,
@@ -44,6 +60,8 @@ class GameState {
       status: status ?? this.status,
       moveHistory: moveHistory ?? this.moveHistory,
       lastMove: lastMove ?? this.lastMove,
+      fenHistory: fenHistory ?? this.fenHistory,
+      historyIndex: historyIndex ?? this.historyIndex,
     );
   }
 }

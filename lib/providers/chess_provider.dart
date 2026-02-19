@@ -58,6 +58,8 @@ class ChessGameNotifier extends Notifier<GameState> {
           king: 3,
         ),
         status: GameStatus.notStarted,
+        fenHistory: [chess.Chess.DEFAULT_POSITION],
+        historyIndex: 0,
       );
     }
 
@@ -69,6 +71,8 @@ class ChessGameNotifier extends Notifier<GameState> {
       (m) => m.name == costModeName,
       orElse: () => CostMode.distance,
     );
+    final fenHistory =
+        _prefs.getStringList(gameFenHistoryKey) ?? [chess.Chess.DEFAULT_POSITION, fen];
 
     final preset = presets.firstWhere(
       (p) => p.name == presetName,
@@ -81,6 +85,8 @@ class ChessGameNotifier extends Notifier<GameState> {
       costMode: costMode,
       status: GameStatus.active,
       moveHistory: moveHistory,
+      fenHistory: fenHistory,
+      historyIndex: fenHistory.length - 1,
     );
   }
 
@@ -90,6 +96,7 @@ class ChessGameNotifier extends Notifier<GameState> {
     _prefs.setString(gameCostModeKey, state.costMode.name);
     _prefs.setString(gameStatusKey, state.status.name);
     _prefs.setStringList(gameMoveHistoryKey, state.moveHistory);
+    _prefs.setStringList(gameFenHistoryKey, state.fenHistory);
   }
 
   void _clearPersistedGame() {
@@ -98,26 +105,31 @@ class ChessGameNotifier extends Notifier<GameState> {
     _prefs.remove(gameCostModeKey);
     _prefs.remove(gameStatusKey);
     _prefs.remove(gameMoveHistoryKey);
+    _prefs.remove(gameFenHistoryKey);
   }
 
   void attachBoardController(ChessBoardController controller) {
     engine.attachController(controller);
-    // Sync persisted position into both the rule engine and the UI controller.
     engine.loadPosition(state.fen);
   }
 
-  void startNewGame(StepCostPreset preset, {CostMode costMode = CostMode.distance, RuleVariant variant = RuleVariant.standard}) {
+  void startNewGame(StepCostPreset preset,
+      {CostMode costMode = CostMode.distance,
+      RuleVariant variant = RuleVariant.standard}) {
     engine = StepUpEngine(
       getIt<RuleEngineFactory>().create(variant),
       _buildCalculator(costMode, preset),
     );
     engine.startNewGame();
+    final initialFen = chess.Chess.DEFAULT_POSITION;
     state = GameState(
-      fen: chess.Chess.DEFAULT_POSITION,
+      fen: initialFen,
       preset: preset,
       costMode: costMode,
       status: GameStatus.active,
       moveHistory: [],
+      fenHistory: [initialFen],
+      historyIndex: 0,
     );
     _persistGame();
   }
@@ -128,43 +140,69 @@ class ChessGameNotifier extends Notifier<GameState> {
       fen: chess.Chess.DEFAULT_POSITION,
       preset: state.preset,
       status: GameStatus.notStarted,
+      fenHistory: [chess.Chess.DEFAULT_POSITION],
+      historyIndex: 0,
     );
   }
 
-  /// Step cost for moving [piece] from [from] to [to].
+  // ---------------------------------------------------------------------------
+  // History navigation
+  // ---------------------------------------------------------------------------
+
+  void stepBack() {
+    if (state.historyIndex <= 0) return;
+    final newIndex = state.historyIndex - 1;
+    final newFen = state.fenHistory[newIndex];
+    engine.loadPosition(newFen);
+    state = state.copyWith(fen: newFen, historyIndex: newIndex);
+  }
+
+  void stepForward() {
+    if (state.historyIndex >= state.fenHistory.length - 1) return;
+    final newIndex = state.historyIndex + 1;
+    final newFen = state.fenHistory[newIndex];
+    engine.loadPosition(newFen);
+    state = state.copyWith(fen: newFen, historyIndex: newIndex);
+  }
+
+  // ---------------------------------------------------------------------------
+  // Cost helpers
+  // ---------------------------------------------------------------------------
+
   int moveCost(PieceKind piece, String from, String to,
       {bool capturingKing = false}) {
     return engine.moveCost(piece, from, to, capturingKing: capturingKing);
   }
 
-  /// Check if either king is under attack (in check).
-  PieceColor? getCheckedSide() {
-    return engine.checkedSide();
-  }
+  PieceColor? getCheckedSide() => engine.checkedSide();
 
-  /// Check if a move can be afforded.
   bool canAffordMove(PieceKind piece, String from, String to) {
     final cost = engine.moveCost(piece, from, to);
     return _stepService.canAfford(cost);
   }
 
-  /// Charge steps and record the move AFTER it has been made on the board.
+  // ---------------------------------------------------------------------------
+  // Move execution
+  // ---------------------------------------------------------------------------
+
   void chargeAndRecordMove(PieceKind piece, String from, String to) {
     final cost = engine.moveCost(piece, from, to);
     _stepService.spendSteps(cost);
 
     final lastSan = engine.lastSanMove ?? '';
+    final newFen = engine.fen;
+    final newFenHistory = [...state.fenHistory, newFen];
 
     state = state.copyWith(
-      fen: engine.fen,
+      fen: newFen,
       moveHistory: [...state.moveHistory, lastSan],
       lastMove: LastMove(from, to),
+      fenHistory: newFenHistory,
+      historyIndex: newFenHistory.length - 1,
     );
     _persistGame();
   }
 
-  /// Handle king capture — called from the board widget when a piece
-  /// is dropped on a king's square.
   bool handleKingCapture({
     required String from,
     required String to,
@@ -172,29 +210,39 @@ class ChessGameNotifier extends Notifier<GameState> {
     required PieceColor capturedKingColor,
   }) {
     final cost = engine.moveCost(attackerKind, from, to, capturingKing: true);
-
     if (!_stepService.canAfford(cost)) return false;
 
     _stepService.spendSteps(cost);
-
     engine.handleKingCapture(from, to);
 
-    final moveNotation =
-        '${StepUpEngine.pieceKindToChar(attackerKind)}x$to#';
+    final moveNotation = '${StepUpEngine.pieceKindToChar(attackerKind)}x$to#';
+    final newFen = engine.fen;
+    final newFenHistory = [...state.fenHistory, newFen];
 
     state = state.copyWith(
-      fen: engine.fen,
+      fen: newFen,
       status: GameStatus.kingCaptured,
       moveHistory: [...state.moveHistory, moveNotation],
       lastMove: LastMove(from, to),
+      fenHistory: newFenHistory,
+      historyIndex: newFenHistory.length - 1,
     );
     _persistGame();
 
     return true;
   }
 
+  // ---------------------------------------------------------------------------
+  // Game outcomes
+  // ---------------------------------------------------------------------------
+
   void resign() {
     state = state.copyWith(status: GameStatus.resigned);
+    _clearPersistedGame();
+  }
+
+  void offerDraw() {
+    state = state.copyWith(status: GameStatus.draw);
     _clearPersistedGame();
   }
 }
