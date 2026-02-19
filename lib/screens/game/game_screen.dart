@@ -6,8 +6,9 @@ import 'package:stepup_chess/engine/piece.dart';
 import 'package:stepup_chess/providers/chess_provider.dart';
 import 'package:stepup_chess/providers/step_provider.dart';
 import 'package:stepup_chess/models/game.dart';
-import 'package:stepup_chess/widgets/step_counter_display.dart';
 import 'package:stepup_chess/widgets/move_history_panel.dart';
+import 'package:stepup_chess/widgets/player_profile_bar.dart';
+import 'package:stepup_chess/widgets/step_counter_display.dart';
 import 'package:stepup_chess/widgets/stepup_chess_board.dart';
 
 class GameScreen extends ConsumerStatefulWidget {
@@ -198,10 +199,11 @@ class _GameScreenState extends ConsumerState<GameScreen> {
       body: SafeArea(
         child: Column(
           children: [
-            // Step counter
-            Padding(
-              padding: const EdgeInsets.symmetric(vertical: 8),
-              child: StepCounterDisplay(fontSize: 24),
+            // Opponent profile (Black)
+            PlayerProfileBar(
+              name: 'Black',
+              isWhite: false,
+              fen: gameState.fen,
             ),
 
             // Chess board
@@ -220,6 +222,14 @@ class _GameScreenState extends ConsumerState<GameScreen> {
                   onKingCapture: _onKingCapture,
                 ),
               ),
+            ),
+
+            // Player profile (White) with shared step counter
+            PlayerProfileBar(
+              name: 'White',
+              isWhite: true,
+              fen: gameState.fen,
+              trailing: const StepCounterDisplay(fontSize: 16),
             ),
 
             // Move history
